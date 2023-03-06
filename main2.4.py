@@ -365,6 +365,7 @@ def main_func(mode=1, mode2=1):
     # 写真ファイルのコピー dat/imgからoutpu/intervaltime/datetime/img
     print('copy img files')
     shutil.copytree(img_dir, os.path.join(output_ex_files_dir, 'img'))
+    time.sleep(2)
 
     print('==========エクセル処理開始==========')
     time.sleep(0.5)
