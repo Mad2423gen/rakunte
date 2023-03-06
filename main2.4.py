@@ -94,11 +94,15 @@ def export_ex(output_ex_files_dir, intervaltime):
     csv_filenames = [os.path.basename(file_path)
                      for file_path in glob.glob(os.path.join(csv_dir, f'{intervaltime}_*.csv'))]
 
-    # error防止: 残っているエクセルタスクを強制終了
-    subprocess.run('taskkill /F /T /IM excel.exe', stdout=None, shell=True)
-
     # rakunte/output/intervaltime/日時フォルダに移動しての処理-------------------
     os.chdir(output_ex_files_dir)
+
+    # start eclel application
+    # pywin32
+    excel = win32com.client.Dispatch('Excel.Application')
+    excel.DisplayAlerts = False
+    time.sleep(3) # Waiting for Excel to start
+
     for csv_file in csv_filenames:
         # csvから画像ファイル名抽出、ファイル名抽出
         print(f'{csv_file}をエクスポート')
@@ -116,10 +120,9 @@ def export_ex(output_ex_files_dir, intervaltime):
                   'r', encoding='utf-8_sig', newline='') as csvf:
             reader = csv.reader(csvf)
             try:
-                # win32com
-                excel = win32com.client.Dispatch('Excel.Application')
-                excel.DisplayAlerts = False
+                # pywin32
                 wb = excel.Workbooks.Open(dummy_file_path)
+                # time.sleep(3)
                 sheet = wb.Worksheets('Sheet1')
                 sheet.Activate()
                 print('excel writing')
@@ -131,7 +134,7 @@ def export_ex(output_ex_files_dir, intervaltime):
                     cell.Hyperlinks.Add(cell, lne[3])
                 print('writing termination')
             except:
-                print('!!!With error exel-write-handling!!!')
+                print('***')
 
             try:
                 print('vba start')
@@ -141,7 +144,7 @@ def export_ex(output_ex_files_dir, intervaltime):
             except:
                 print('!!!With error vba-handling!!!')
 
-        time.sleep(1)
+        time.sleep(2)
 
         # rename ダミーファイル名をジャンル名に
         try:
@@ -149,6 +152,9 @@ def export_ex(output_ex_files_dir, intervaltime):
             print('rename termination\n')
         except:
             print('!!!With error rename-handling!!!')
+
+    # excel spplication shutdown
+    excel.quit()
 
     # カレントディレクトリに復帰
     os.chdir(path)
@@ -178,7 +184,7 @@ def csv_save(genre, genre_id, intervaltime, driver):
     global old_csv_datas, keywords, exclusion_keywords, save_data
     print('\nrakuten scray')
     new_data = []
-    for i in range(1, 6):  # 1~５ページ
+    for i in range(1, 5):  # 1~4ページ
         print(f'page:{i}')
         # target_url
         url = f'https://ranking.rakuten.co.jp/{intervaltime}/{genre_id}/p={i}'
@@ -266,9 +272,14 @@ def csv_save(genre, genre_id, intervaltime, driver):
 # ===========================================================================
 # 全処理実行関数　mode:リアルタイム、デイリー、ウィークリー選択　　mode2:テスト、本番実行選択
 def main_func(mode=1, mode2=1):
+
+    # error防止: 残っているエクセルタスクを強制終了
+    print('\n excel task kill')
+    subprocess.run('taskkill /F /T /IM excel.exe', stdout=None, shell=True)
+
     # 開始時刻取得
     start_time = add_datetime()
-    print('==========スクレイピング処理開始==========')
+    print('\n==========スクレイピング処理開始==========')
 
     # counting period
     global intervaltime, genre_file
@@ -345,7 +356,7 @@ def main_func(mode=1, mode2=1):
     shutil.copytree(img_dir, os.path.join(output_ex_files_dir, 'img'))
 
     print('==========エクセル処理開始==========')
-    time.sleep(5)  # コピー終了待機
+    # time.sleep(5)  # コピー終了待機
     # CSVからエクセルへ書き込み＆マクロ実行
     export_ex(output_ex_files_dir, intervaltime)
 
