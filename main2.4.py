@@ -367,7 +367,7 @@ def main_func(mode=1, mode2=1):
     shutil.copytree(img_dir, os.path.join(output_ex_files_dir, 'img'))
 
     print('==========エクセル処理開始==========')
-    time.sleep(2)
+    time.sleep(5)
     # CSVからエクセルへ書き込み＆マクロ実行
     export_ex(output_ex_files_dir, intervaltime)
 
