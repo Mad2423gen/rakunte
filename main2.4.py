@@ -66,8 +66,6 @@ def filename_creation(src):
 # image download
 # When there is only one URL to link to
 def img_save(src, save_dir=img_dir):
-    # if not os.path.isdir(save_dir):
-    #     os.mkdir(save_dir)
     os.makedirs(save_dir, exist_ok=True)
     while True:
         try:
@@ -102,7 +100,6 @@ def export_ex(output_ex_files_dir, intervaltime):
     # rakunte/output/intervaltime/日時フォルダに移動しての処理-------------------
     os.chdir(output_ex_files_dir)
     for csv_file in csv_filenames:
-        # outputfilename = f"{os.path.splitext(csv_file)[0]}.xlsm"
         # csvから画像ファイル名抽出、ファイル名抽出
         print(f'{csv_file}をエクスポート')
 
@@ -133,35 +130,16 @@ def export_ex(output_ex_files_dir, intervaltime):
                     cell = sheet.Cells(i + 2, 5)
                     cell.Hyperlinks.Add(cell, lne[3])
                 print('writing termination')
-                # wb.Save()
-                # wb.Close()
             except:
                 print('!!!With error exel-write-handling!!!')
 
-            # time.sleep(1)
-
             try:
                 print('vba start')
-                # xl2 = win32com.client.Dispatch('Excel.Application')
-                # xl2.Workbooks.Open(dummy_file_path)
                 excel.Application.Run('Module1.getimg')
                 excel.Workbooks(1).Close(SaveChanges=1)
                 print('vba termination')
             except:
                 print('!!!With error vba-handling!!!')
-
-        # time.sleep(0.5)
-
-        # run vba
-        # try:
-        #     print('vba start')
-        #     xl2 = win32com.client.Dispatch('Excel.Application')
-        #     xl2.Workbooks.Open(dummy_file_path)
-        #     xl2.Application.Run('Module1.getimg')
-        #     xl2.Workbooks(1).Close(SaveChanges=1)
-        #     print('vba termination')
-        # except:
-        #     print('!!!With error vba-handling!!!')
 
         time.sleep(1)
 
