@@ -37,6 +37,8 @@ time_table_file = os.path.join(conf_dir, 'timetable.csv')
 time_stamp_file = os.path.join(conf_dir, 'time_tamp.txt')
 # キーワードファイル　共通.txt
 common_keyword_file = os.path.join(keyword_dir, '共通.txt')
+
+
 # ===========================================================================
 # Decorator for retries
 def retry(max_attempts, wait_time):
@@ -193,6 +195,7 @@ def scray_thumbnail(url, driver):
         return [(tit.text, img.attrs['src'], filename_creation(img.attrs['src']),
                  tit.attrs['href']) for tit, img in zip(tags_titles, tags_imgs) if tit]
 
+
 # ===========================================================================
 # スクレイピングとCSV保存、画像保存
 def csv_save(genre, genre_id, intervaltime, driver):
@@ -223,7 +226,8 @@ def csv_save(genre, genre_id, intervaltime, driver):
         # 除外キーワードファイル有
         if os.path.isfile(exclusion_keyword_file) and os.path.isfile(exclusion_keyword_file2):
             print('除外キーワードファイル有、', end='')
-            keywords = add_functions.read_keywords(exclusion_keyword_file)
+            keywords = add_functions.read_keywords(exclusion_keyword_file) + \
+                       add_functions.read_keywords(exclusion_keyword_file2)
             # キーワード登録無
             if not keywords:
                 # new_dataをそのまま保存
@@ -273,6 +277,9 @@ def csv_save(genre, genre_id, intervaltime, driver):
                     .csv_read_title(os.path.join(csv_dir, f'{intervaltime}_{genre}.csv'))
                 joint_data = old_data + keywords
                 save_data = [x for x in new_data if not any(y in x[0] for y in joint_data)]
+
+    # url重複判定（timetable.csv設定値が「URL_duplicate_detection,1」の場合ONになる
+    save_data = add_functions.url_duplicate_detection(save_data, intervaltime, genre)
 
     # img&csv保存===========================================================
     # save_dataから画像のリンクを取得し、ダウンロード（並列処理）
@@ -385,13 +392,12 @@ def main_func(mode=1, mode2=1):
         print(f'開始時間：{start_time}\n終了時間：{end_time}', file=f)
 
 
+
 # ===========================================================================
 
 if __name__ == '__main__':
-
-    # テスト、本番選択（テスト用はジャンルが３種類,リアルタイム実行）
     # 1はテスト、２は本番
-    mode_b = 1
+    mode_b = 2
 
     # time_table import
     time_list = []
