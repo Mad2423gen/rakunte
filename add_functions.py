@@ -24,7 +24,7 @@ genru_file = os.path.join(conf_dir, 'rakuten_genre.csv')
 # キーワードフォルダ
 keyword_dir = os.path.join(conf_dir, 'keyword')
 # タイムスタンプファイル
-time_stamp_file = os.path.join(conf_dir, 'time_tamp.txt')
+time_stamp_file = os.path.join(conf_dir, 'time_stamp.txt')
 # キーワードファイル　共通.txt
 common_keyword_file = os.path.join(keyword_dir, '共通.txt')
 
@@ -38,11 +38,15 @@ def csv_read_title(csv_file):
 def csv_read(csv_file):
     return [row for row in csv.reader(open(csv_file, 'r', encoding='utf-8_sig', newline=''))]
 
+# 空のファイルを作る
+def make_file(filename):
+    with open(filename, 'w', encoding='utf-8_sig') as f:
+        pass
 # テキストファイルのキーワードを取得　リストで返す
 def read_keywords(file):
     with open(file, 'r', encoding='utf-8_sig') as rf:
         ky_a = [line.rstrip("\n") for line in rf.readlines()]
-    with open(os.path.join(keyword_dir, '共通.txt'), 'r', encoding='utf-8_sig') as rfb:
+    with open(common_keyword_file, 'r', encoding='utf-8_sig') as rfb:
         ky_b = [line_b.rstrip("\n") for line_b in rfb.readlines()]
     return ky_a + ky_b
 
@@ -56,8 +60,9 @@ def delete_old_files(n):
                     - os.path.getctime(filepath) >= int(n) * 86400:
                 print("保存期間経過、datファイル消去")
                 [shutil.rmtree(rdr) for rdr in (csv_dir, img_dir)]
-                # 時間計測ファイルも削除
+                # タイムスタンプファイルも削除
                 os.remove(time_stamp_file) if os.path.isfile(time_table_file) else None
+                # 削除したディレクトリ再生
                 [os.makedirs(dr, exist_ok=True) for dr in (csv_dir, img_dir)]
                 break
 
@@ -65,9 +70,8 @@ def delete_old_files(n):
 #  空のキーワードファイル作成(無条件)
 def make_keyword_file():
     for lt in csv_read(genru_file):
-        pathlib.Path(os.path.join(keyword_dir, f'{lt[0]}.txt')).touch()
-    pathlib.Path(os.path.join(keyword_dir, '共通.txt')).touch()
-
+        make_file(f'{lt[0]}.txt')
+    make_file(common_keyword_file)
 
 # 不足しているキーワードディレクトリ、ファイルを作成
 def make_keyword_file_missing():
@@ -77,13 +81,13 @@ def make_keyword_file_missing():
     file_name_lists_origin = set(f'{lt[0]}.txt' for lt in csv_read(genru_file))
     target_lists = set(os.listdir(keyword_dir))
     [print(f'キワードファイル補完：{replenish_file_name}')
-     or pathlib.Path(os.path.join(keyword_dir, replenish_file_name)).touch()
+     or make_file(os.path.join(keyword_dir, replenish_file_name))
      for replenish_file_name in file_name_lists_origin - target_lists
      if replenish_file_name]
     if not os.path.isfile(common_keyword_file):
-        pathlib.Path(common_keyword_file).touch()
+        make_file(common_keyword_file)
 
-
+# 既に保存されているURLを新規データと比較して差分を返す
 def url_duplicate_detection(save_data, intervaltime, genre):
     old_filename = f'{intervaltime}_{genre}.csv'
     if os.path.isfile(old_filename):
@@ -95,18 +99,6 @@ def url_duplicate_detection(save_data, intervaltime, genre):
     else:
         out = save_data
     return out
-
-
-# import datetime
-#
-# specified_date = datetime.datetime(2022, 1, 1)  # 指定日を設定
-#
-# if datetime.datetime.now() > specified_date:
-#     print("指定日を過ぎたため、プログラムを終了します。")
-#     exit()
-# else:
-#     # 指定日以前の場合は、プログラムを続ける
-#     # ここに続くプログラムを記述
 
 
 # ---------------------------------------------------------------------------------
