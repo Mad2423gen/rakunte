@@ -3,9 +3,11 @@ import os
 import shutil
 import time
 import re
-import pathlib
-import datetime
+import requests
+from bs4 import BeautifulSoup
 
+
+import lxml
 # path definition============================================================
 path = os.getcwd()
 dat_dir = os.path.join(path, 'dat')  # csc,imgフォルダの親フォルダ
@@ -24,7 +26,7 @@ genru_file = os.path.join(conf_dir, 'rakuten_genre.csv')
 # キーワードフォルダ
 keyword_dir = os.path.join(conf_dir, 'keyword')
 # タイムスタンプファイル
-time_stamp_file = os.path.join(conf_dir, 'time_stamp.txt')
+time_stamp_file = os.path.join(conf_dir, 'time_tamp.txt')
 # キーワードファイル　共通.txt
 common_keyword_file = os.path.join(keyword_dir, '共通.txt')
 
@@ -59,7 +61,7 @@ def delete_old_files(n):
             if os.path.isfile(filepath) and time.time() \
                     - os.path.getctime(filepath) >= int(n) * 86400:
                 print("保存期間経過、datファイル消去")
-                [shutil.rmtree(rdr) for rdr in (csv_dir, img_dir)]
+                [shutil.rmtree(rdr, ignore_errors=True) for rdr in (csv_dir, img_dir)]
                 # タイムスタンプファイルも削除
                 os.remove(time_stamp_file) if os.path.isfile(time_table_file) else None
                 # 削除したディレクトリ再生
@@ -100,14 +102,77 @@ def url_duplicate_detection(save_data, intervaltime, genre):
         out = save_data
     return out
 
+# レビューとプライスを付加したバージョン ※mainに移動したので一応使っていない　2023-03-13
+def scray_thumbnail2(target_url):
+    time.sleep(0.25)
+    res = requests.get(target_url, timeout=(3.0, 5.0))
+    html_source = res.text.replace('<script language="JavaScript" type="text/javascript">', '')
 
+    # parse
+    soup = BeautifulSoup(html_source, 'lxml')
+    # Confirmation of page existence
+    flags = soup.find('img', src=re.compile('./指定されたページが見つかりません（エラー404）_ 楽天_files/w100.gif'))
+
+    if flags:
+        pass
+    else:
+        # Declaration of tag element list
+        title_lists, title_urls, filenames, img_urls, revirews_lists, price_lists = [], [], [], [], [], []
+        # Declaration of elements for output
+        out_datas = []
+
+        # hint review_tagはあったりなかったりするので、先ず親タグからその部分のブロックを抽出、
+        # 更にfindないしselectで抽出する、返り値がFalseの場合はレビューが存在しないと言うことになる。
+
+        # get title,title_url,review
+        tag_block = 'div.rnkRanking_upperbox'
+        title_block_sources = soup.select(tag_block)
+        # pprint(title_block_sources)    # For Developer Test
+        for title_block_source in title_block_sources:
+            # pprint(block_source.contents)   #For Developer Test
+
+            # get litle,title_url
+            title = title_block_source.select_one('div.rnkRanking_itemName > a')
+            title_url = title.attrs['href']
+            title_lists.append(str(title.text))
+            title_urls.append(title_url)
+
+            # get review  ※title_block内に「レビュー」が含まれなければNoneを返す
+            review_tag = title_block_source.find('a', text=re.compile('レビュー'))
+            if review_tag:
+                revirews_lists.append(re.sub(r'\D', '', review_tag.text))
+            else:
+                revirews_lists.append('None')
+
+        # get pcrice
+        [price_lists.append(p.text.replace('円', '')) for p in soup.select('div.rnkRanking_price')]
+        # get img
+        [img_urls.append(img_url.attrs['src']) for img_url
+         in soup.select('div.rnkRanking_image > div > a > img')]
+
+        #  Reference Element List============================================================
+        #   entry ==  title, img_url, filename, title_url, price, review
+        #
+        #  for out_datas
+        #  dataname == title_lists, title_urls, finames, img_urls, revirews_lists, price_list
+        #  dataname == out_datas
+        # ===================================================================================
+
+        for i, title in enumerate(title_lists):
+            # entry is --> title, img_url, filename, title_url, price, review
+            # filenameのエントリーは不要になったので空欄、他のロジックに影響するので削除しないこと
+            out_datas.append((title, img_urls[i], '', title_urls[i], price_lists[i], revirews_lists[i]))
+            # for developer testing -------------
+            # print(price_lists)
+            # print(title_lists)
+            # print(title_urls)
+            # print(img_urls[1])
+            # -----------------------------------
+        return out_datas
+        # return print(out_datas[0]) # for developer testing
+
+#
 # ---------------------------------------------------------------------------------
 #
-# if __name__ == '__main__':
-#     savedata = ['https://item.rakuten.co.jp/book/17448477/?l2-id=Ranking_PC_realtime-101240-d_rnkRankingMain&s-id' \
-#                 '=Ranking_PC_realtime-101240-d_rnkRankingMain_3',
-#                 'https//item.rakuten-hogemoge'
-#                 ]
-#
-#     output = url_duplicate_detection(savedata)
-#     print(output)
+if __name__ == '__main__':
+    pass

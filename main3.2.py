@@ -1,3 +1,4 @@
+
 import csv
 import glob
 import os
@@ -116,11 +117,19 @@ def export_ex(output_ex_files_dir, intervaltime):
                 sheet.Activate()
                 print('excel writing')
                 for i, lne in enumerate(reader):
+                    # img filename
                     sheet.Cells(i + 2, 1).Value = lne[2]
+                    # title
                     sheet.Cells(i + 2, 4).Value = lne[0]
+                    # title link
                     sheet.Cells(i + 2, 5).Value = lne[3]
                     cell = sheet.Cells(i + 2, 5)
                     cell.Hyperlinks.Add(cell, lne[3])
+                    # price
+                    sheet.Cells(i + 2, 6).Value = lne[4]
+                    # review
+                    sheet.Cells(i + 2, 7).Value = lne[5]
+
                 print('writing termination')
             except:
                 print('***')
@@ -169,6 +178,7 @@ def scray_thumbnail(url):
                 print('該当ページなし、スキップ')
                 pass
             else:
+                # todo:　書き換え　レビューと価格追加
                 tags_titles = soup.select('div.rnkRanking_itemName > a')
                 tags_imgs = soup.select('div.rnkRanking_image > div > a > img')
                 return [(tit.text, img.attrs['src'], filename_creation(img.attrs['src']),
@@ -176,6 +186,76 @@ def scray_thumbnail(url):
         except Timeout:
             # print('楽天サーバーの異常、処理を中断します')
             time.sleep(3)
+
+
+# ===========================================================================
+# priceとreview 追加
+def scray_thumbnail2(target_url):
+
+    # time.sleep(0.25)
+    res = requests.get(target_url, timeout=(30.0, 30.0))
+
+    # javascriptとして扱われているhtmlコードを解除-->これで20位以降のソースも読み込めるようになる
+    html_source = res.text.replace('<script language="JavaScript" type="text/javascript">', '')
+
+    # parse
+    soup = BeautifulSoup(html_source, 'lxml')
+
+    # Confirmation of page existence
+    flags = soup.find('img', src=re.compile('./指定されたページが見つかりません（エラー404）_ 楽天_files/w100.gif'))
+
+    if flags:
+        pass
+    else:
+        # Declaration of tag element list
+        title_lists, title_urls, filenames, img_urls, revirews_lists, price_lists = [], [], [], [], [], []
+        # Declaration of elements for output
+        out_datas = []
+
+        # hint review_tagはあったりなかったりするので、先ず親タグからその部分のブロックを抽出、
+        # 更にfindないしselectで抽出する、返り値がFalseの場合はレビューが存在しないと言うこと
+
+        # get title,title_url,review
+        for title_block_source in soup.select('div.rnkRanking_upperbox'):
+
+            # get litle,title_url
+            title = title_block_source.select_one('div.rnkRanking_itemName > a')
+            title_url = title.attrs['href']
+            title_lists.append(str(title.text))
+            title_urls.append(title_url)
+
+            # get review  ※title_block内に「https://review.rakuten」が含まれなければNoneを返す
+            if review_tag := title_block_source.find(href=re.compile('https://review.rakuten')):
+                revirews_lists.append(review_tag.text.replace('レビュー(', '').replace('件)', ''))
+            else:
+                revirews_lists.append('None')
+
+        # get pcrice
+        [price_lists.append(p.text.replace('円', '')) for p in soup.select('div.rnkRanking_price')]
+        # get img_url
+        [img_urls.append(img_url.attrs['src']) for img_url
+         in soup.select('div.rnkRanking_image > div > a > img')]
+
+        #  Reference Element List============================================================
+        #   entry ==  title, img_url, filename, title_url, price, review
+        #
+        #  for out_datas
+        #  dataname == title_lists, title_urls, finames, img_urls, revirews_lists, price_list
+        #  dataname == out_datas
+        # ===================================================================================
+
+        for i, title in enumerate(title_lists):
+            # entry is --> title, img_url, filename, title_url, price, review
+            # print(img_urls[i])
+             out_datas.append((title, img_urls[i], filename_creation(img_urls[i]), title_urls[i], price_lists[i], revirews_lists[i]))
+            # for developer testing -------------
+            # print(price_lists)
+            # print(title_lists)
+            # print(title_urls)
+            # print(img_urls[1])
+            # -----------------------------------
+        return out_datas
+        # return print(out_datas[0]) # for developer testing
 
 
 # ===========================================================================
@@ -191,7 +271,7 @@ def csv_save(genre, genre_id, intervaltime):
         url = f'https://ranking.rakuten.co.jp/{intervaltime}/{genre_id}/p={i}'
 
         # スクレイピングしたデータを new_data に格納
-        [new_data.append([ttl[0], ttl[1], ttl[2], ttl[3]]) for ttl in scray_thumbnail(url)]
+        [new_data.append([ttl[0], ttl[1], ttl[2], ttl[3], ttl[4], ttl[5]]) for ttl in scray_thumbnail2(url)]
 
     # =====================csv保存データ作成==================================
 
@@ -360,7 +440,7 @@ def main_func(mode=1, mode2=1):
 if __name__ == '__main__':
 
     # 1はテスト、２は本番
-    mode_b = 1
+    mode_b = 2
 
     # time_table import
     time_list = []

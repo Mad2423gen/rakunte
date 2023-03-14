@@ -135,7 +135,7 @@ def export_ex(output_ex_files_dir, intervaltime):
             try:
                 # pywin32
                 wb = excel.Workbooks.Open(dummy_file_path)
-                time.sleep(10)
+                time.sleep(3)
                 sheet = wb.Worksheets('Sheet1')
                 sheet.Activate()
                 print('excel writing')
@@ -397,7 +397,7 @@ def main_func(mode=1, mode2=1):
 
 if __name__ == '__main__':
     # 1はテスト、２は本番
-    mode_b = 2
+    mode_b = 1
 
     # time_table import
     time_list = []

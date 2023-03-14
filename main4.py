@@ -14,11 +14,13 @@ from functools import wraps
 import requests
 from requests.exceptions import Timeout
 import schedule
-import win32com.client
 from bs4 import BeautifulSoup
 from joblib import Parallel, delayed
 import add_functions
 import logging
+import openpyxl
+from openpyxl.styles import Font
+from openpyxl.styles import Alignment
 
 # path definition============================================================
 path = os.getcwd()
@@ -89,62 +91,54 @@ def export_ex(output_ex_files_dir, intervaltime):
 
     # start eclel application
     # pywin32
-    excel = win32com.client.Dispatch('Excel.Application')
+    # excel = win32com.client.Dispatch('Excel.Application')
     # time.sleep(3)  # Waiting for Excel to start
 
     for csv_file in csv_filenames:
-        # csvから画像ファイル名抽出、ファイル名抽出
-        print(f'{csv_file}をエクスポート')
-        # 作業用ファイルのダミーファイル
-        dummy_filename = fr'{random.randint(0, 100000)}.xlsm'
-        # フルパス
-        dummy_file_path = os.path.join(output_ex_files_dir, dummy_filename)
+        dt = add_functions.csv_read(os.path.join(csv_dir, csv_file))
+        print(f'from {csv_file} export to excel')
+        book = openpyxl.load_workbook(os.path.join(conf_dir, 'temp_file.xlsx'))
+        sheet = book['Sheet1']
+        for i, low in enumerate(dt):
+            sheet.cell(row=i + 2, column=2).value = f'{low[1]}'
+            sheet.cell(row=i + 2, column=2).font = Font(color='FFFFFF')
+            sheet.cell(row=i + 2, column=4).value = low[0]
+            sheet.cell(row=i + 2, column=4).alignment = \
+                Alignment(horizontal='justify', vertical='center')
+            sheet.cell(row=i + 2, column=5).hyperlink = low[3]
+            sheet.cell(row=i + 2, column=5).alignment = \
+                Alignment(horizontal='justify', vertical='center')
+        book.save(f'{os.path.splitext(csv_file)[0]}.xlsx')
+        book.close()
+        print('process termination')
 
-        # エクセルのテンプレートファイルをダミーファイル名でコピー（重複防止）
-        shutil.copyfile(ex_temp_file, dummy_file_path)
-
-        # from csv to write exel
-        with open(os.path.join(csv_dir, csv_file),
-                  'r', encoding='utf-8_sig', newline='') as csvf:
-            reader = csv.reader(csvf)
-            try:
-                # pywin32
-                excel.DisplayAlerts = False
-                wb = excel.Workbooks.Open(dummy_file_path)
-                # time.sleep(2)
-                sheet = wb.Worksheets('Sheet1')
-                sheet.Activate()
-                print('excel writing')
-                for i, lne in enumerate(reader):
-                    sheet.Cells(i + 2, 1).Value = lne[2]
-                    sheet.Cells(i + 2, 4).Value = lne[0]
-                    sheet.Cells(i + 2, 5).Value = lne[3]
-                    cell = sheet.Cells(i + 2, 5)
-                    cell.Hyperlinks.Add(cell, lne[3])
-                print('writing termination')
-            except:
-                print('***')
-
-            try:
-                print('vba start')
-                excel.DisplayAlerts = False
-                excel.Application.Run('Module1.getimg')
-                excel.Workbooks(1).Close(SaveChanges=1)
-                print('vba termination')
-            except:
-                print('!!!With error vba-handling!!!')
-
-        time.sleep(1)
-
+        # # csvから画像ファイル名抽出、ファイル名抽出
+        # print(f'{csv_file}をエクスポート')
+        # # 作業用ファイルのダミーファイル
+        # dummy_filename = fr'{random.randint(0, 100000)}.xlsm'
+        # # フルパス
+        # dummy_file_path = os.path.join(output_ex_files_dir, dummy_filename)
+        #
+        # # エクセルのテンプレートファイルをダミーファイル名でコピー（重複防止）
+        # shutil.copyfile(ex_temp_file, dummy_file_path)
+        #
+        # # from csv to write exel
+        # with open(os.path.join(csv_dir, csv_file),
+        #           'r', encoding='utf-8_sig', newline='') as csvf:
+        #     reader = csv.reader(csvf)
+        #
+        #
+        # time.sleep(1)
+        #
         # rename ダミーファイル名をジャンル名に
-        try:
-            os.rename(dummy_filename, f'{os.path.splitext(csv_file)[0]}.xlsm')
-            print('rename termination\n')
-        except:
-            print('!!!With error rename-handling!!!')
+        # try:
+        #     os.rename(dummy_filename, f'{os.path.splitext(csv_file)[0]}.xlsm')
+        #     print('rename termination\n')
+        # except:
+        #     print('!!!With error rename-handling!!!')
 
     # excel spplication shutdown
-    excel.quit()
+    # excel.quit()
 
     # カレントディレクトリに復帰
     os.chdir(path)
@@ -262,19 +256,19 @@ def csv_save(genre, genre_id, intervaltime):
                     .csv_read_title(os.path.join(csv_dir, f'{intervaltime}_{genre}.csv'))
                 joint_datas = old_data + keywords
                 # 複数の条件のいずれにも当てはまらなければsave_dataに追加
-                for ndata in new_data:
-                    if not any(dta in ndata[0] for dta in joint_datas):
-                        save_data.append(ndata)
-                save_data.extend([ndata for ndata in new_data if not any(dta in ndata[0] for dta in joint_datas)])
+                # save_data.extend([ndata for ndata in new_data
+                #                   if not any(dta in ndata[0] for dta in joint_datas)])
+                save_data = [ndata for ndata in new_data
+                             if not any(dta in ndata[0] for dta in joint_datas)]
 
     # url重複判定（timetable.csv設定値が「URL_duplicate_detection,1」の場合ONになる
     save_data = add_functions.url_duplicate_detection(save_data, intervaltime, genre)
 
     # img&csv保存===========================================================
     # save_dataから画像のリンクを取得し、ダウンロード（並列処理）
-    print('img save now')
-    img_saves([row[1] for row in save_data])
-    print('img saved', '\n')
+    # print('img save now')
+    # img_saves([row[1] for row in save_data])
+    # print('img saved', '\n')
 
     # csvへ取得データ保存
     print('csv save now')
@@ -338,10 +332,11 @@ def main_func(mode=1, mode2=1):
 
     # 処理後のエクセルファイルの保存先ディレクトリ　例）output/realtime/日付フォルダ
     output_ex_files_dir = os.path.join(output_dir, intervaltime, add_datetime())
+    os.makedirs(output_ex_files_dir)
 
     # 写真ファイルのコピー dat/imgからoutpu/intervaltime/datetime/img
-    print('copy img files')
-    shutil.copytree(img_dir, os.path.join(output_ex_files_dir, 'img'))
+    # print('copy img files')
+    # shutil.copytree(img_dir, os.path.join(output_ex_files_dir, 'img'))
 
     print('==========エクセル処理開始==========')
     # time.sleep(5)  # コピー終了待機

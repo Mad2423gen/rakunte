@@ -1,7 +1,7 @@
 import csv
 import glob
 import os
-import sys
+import pathlib
 import random
 import re
 import shutil
@@ -12,13 +12,14 @@ import urllib.parse
 from datetime import datetime
 from functools import wraps
 import requests
-from requests.exceptions import Timeout
 import schedule
 import win32com.client
 from bs4 import BeautifulSoup
 from joblib import Parallel, delayed
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from webdriver_manager.chrome import ChromeDriverManager
 import add_functions
-import logging
 
 # path definition============================================================
 path = os.getcwd()
@@ -36,6 +37,28 @@ time_table_file = os.path.join(conf_dir, 'timetable.csv')
 time_stamp_file = os.path.join(conf_dir, 'time_tamp.txt')
 # キーワードファイル　共通.txt
 common_keyword_file = os.path.join(keyword_dir, '共通.txt')
+
+
+# ===========================================================================
+# Decorator for retries
+def retry(max_attempts, wait_time):
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            attempts = 0
+            while True:
+                try:
+                    result = func(*args, **kwargs)
+                    return result
+                except:
+                    attempts += 1
+                    if attempts >= max_attempts:
+                        raise
+                    time.sleep(wait_time)
+
+        return wrapper
+
+    return decorator
 
 
 # ===========================================================================
@@ -58,7 +81,7 @@ def img_save(src, save_dir=img_dir):
     while True:
         try:
             with open(os.path.join(save_dir, filename_creation(src)), "wb") as f:
-                f.write(requests.get(src, timeout=(3, 3)).content)
+                f.write(requests.get(src).content)
             break
         except requests.exceptions.RequestException as e:
             print(e)
@@ -90,11 +113,13 @@ def export_ex(output_ex_files_dir, intervaltime):
     # start eclel application
     # pywin32
     excel = win32com.client.Dispatch('Excel.Application')
+    excel.DisplayAlerts = False
     # time.sleep(3)  # Waiting for Excel to start
 
     for csv_file in csv_filenames:
         # csvから画像ファイル名抽出、ファイル名抽出
         print(f'{csv_file}をエクスポート')
+
         # 作業用ファイルのダミーファイル
         dummy_filename = fr'{random.randint(0, 100000)}.xlsm'
         # フルパス
@@ -109,7 +134,6 @@ def export_ex(output_ex_files_dir, intervaltime):
             reader = csv.reader(csvf)
             try:
                 # pywin32
-                excel.DisplayAlerts = False
                 wb = excel.Workbooks.Open(dummy_file_path)
                 # time.sleep(2)
                 sheet = wb.Worksheets('Sheet1')
@@ -127,7 +151,6 @@ def export_ex(output_ex_files_dir, intervaltime):
 
             try:
                 print('vba start')
-                excel.DisplayAlerts = False
                 excel.Application.Run('Module1.getimg')
                 excel.Workbooks(1).Close(SaveChanges=1)
                 print('vba termination')
@@ -153,34 +176,29 @@ def export_ex(output_ex_files_dir, intervaltime):
 # ===========================================================================
 # Page source acquisition block
 # スクレイピング本体、　１ページのソースからタグを検出、データ取得
-def scray_thumbnail(url):
-    time.sleep(0.25)  # 高速すぎるので時間調整
-    while True:
-        try:
-            html_source = requests.get(url, timeout=(3.0, 5.0))
-
-            # BeautofulSoupが誤認識してしまうスクリプトを削除、これを除外すると読み込み不良になる
-            # これを解除することでrequests.getによるデータ取得が可能になる
-            html_source = html_source.text.replace('<script language="JavaScript" type="text/javascript">', '')
-
-            soup = BeautifulSoup(html_source, 'lxml')
-            flags = soup.find('img', src=re.compile('./指定されたページが見つかりません（エラー404）_ 楽天_files/w100.gif'))
-            if flags:
-                print('該当ページなし、スキップ')
-                pass
-            else:
-                tags_titles = soup.select('div.rnkRanking_itemName > a')
-                tags_imgs = soup.select('div.rnkRanking_image > div > a > img')
-                return [(tit.text, img.attrs['src'], filename_creation(img.attrs['src']),
-                         tit.attrs['href']) for tit, img in zip(tags_titles, tags_imgs) if tit]
-        except Timeout:
-            # print('楽天サーバーの異常、処理を中断します')
-            time.sleep(3)
+@retry(max_attempts=5, wait_time=2)  # 最大５回、10秒後リトライ
+def scray_thumbnail(url, driver):
+    driver.get(url)
+    # 要素が読み込まれるまで待機するためのダミーメソッド
+    dummy_tags = driver.find_elements(By.CLASS_NAME, 'rnkRanking_itemName')
+    # ページソース取得
+    html_source = driver.page_source
+    # 保存するデータ抽出(use BeautifulSoup4)
+    soup = BeautifulSoup(html_source, 'lxml')  # importでlxmlを削除するとエラーになる
+    flags = soup.find(src=re.compile('ページが表示できません'))
+    if flags:
+        print(flags)
+        pass
+    else:
+        tags_titles = soup.select('div.rnkRanking_itemName > a')
+        tags_imgs = soup.select('div.rnkRanking_image > div > a > img')
+        return [(tit.text, img.attrs['src'], filename_creation(img.attrs['src']),
+                 tit.attrs['href']) for tit, img in zip(tags_titles, tags_imgs) if tit]
 
 
 # ===========================================================================
 # スクレイピングとCSV保存、画像保存
-def csv_save(genre, genre_id, intervaltime):
+def csv_save(genre, genre_id, intervaltime, driver):
     # スクレイピング　（ジャンル内の全ページデータ取得）
     global old_csv_datas, keywords, exclusion_keywords, save_data
     print('\nrakuten scray')
@@ -191,7 +209,7 @@ def csv_save(genre, genre_id, intervaltime):
         url = f'https://ranking.rakuten.co.jp/{intervaltime}/{genre_id}/p={i}'
 
         # スクレイピングしたデータを new_data に格納
-        [new_data.append([ttl[0], ttl[1], ttl[2], ttl[3]]) for ttl in scray_thumbnail(url)]
+        [new_data.append([ttl[0], ttl[1], ttl[2], ttl[3]]) for ttl in scray_thumbnail(url, driver)]
 
     # =====================csv保存データ作成==================================
 
@@ -208,7 +226,8 @@ def csv_save(genre, genre_id, intervaltime):
         # 除外キーワードファイル有
         if os.path.isfile(exclusion_keyword_file) and os.path.isfile(exclusion_keyword_file2):
             print('除外キーワードファイル有、', end='')
-            keywords = add_functions.read_keywords(exclusion_keyword_file)
+            keywords = add_functions.read_keywords(exclusion_keyword_file) + \
+                       add_functions.read_keywords(exclusion_keyword_file2)
             # キーワード登録無
             if not keywords:
                 # new_dataをそのまま保存
@@ -216,12 +235,9 @@ def csv_save(genre, genre_id, intervaltime):
                 save_data = new_data
             # キーワード登録有
             else:
-                save_data = []
                 print('キーワード登録有、該当を削除、ジャンルCSVへ保存')
                 # new_dataからキーワード対象を除外する
-                for ndata in new_data:
-                    if not any(dta in ndata[0] for dta in keywords):
-                        save_data.append(ndata)
+                save_data = [x for x in new_data if not any(y in x[0] for y in keywords)]
 
         # 除外キーワードファイル無
         else:
@@ -257,15 +273,10 @@ def csv_save(genre, genre_id, intervaltime):
             else:
                 # ジャンルcsvとキーワードを結合、new_dataと比較する
                 print('キーワード登録有、登録キーワードを結合、新データと比較、差分を保存')
-                save_data = []
                 old_data = add_functions \
                     .csv_read_title(os.path.join(csv_dir, f'{intervaltime}_{genre}.csv'))
-                joint_datas = old_data + keywords
-                # 複数の条件のいずれにも当てはまらなければsave_dataに追加
-                for ndata in new_data:
-                    if not any(dta in ndata[0] for dta in joint_datas):
-                        save_data.append(ndata)
-                save_data.extend([ndata for ndata in new_data if not any(dta in ndata[0] for dta in joint_datas)])
+                joint_data = old_data + keywords
+                save_data = [x for x in new_data if not any(y in x[0] for y in joint_data)]
 
     # url重複判定（timetable.csv設定値が「URL_duplicate_detection,1」の場合ONになる
     save_data = add_functions.url_duplicate_detection(save_data, intervaltime, genre)
@@ -324,11 +335,37 @@ def main_func(mode=1, mode2=1):
     # 作成日を参照し、期間が経過していたらcsv and img フォルダ削除
     add_functions.delete_old_files(specified_date)
 
+    # Use browser cache ======================================================
+    options = webdriver.ChromeOptions()
+    options.add_argument("--disable-extensions")
+    options.add_argument("--disable-dev-shm-usage")
+    options.add_argument("--disable-browser-side-navigation")
+    options.add_argument("--disable-gpu")
+    options.add_argument("--disable-infobars")
+    options.add_argument("--disable-plugins-discovery")
+    options.add_argument("--start-maximized")
+    options.add_argument("--disable-web-security")
+    options.add_argument("--disable-site-isolation-trials")
+    options.add_argument("--disable-hang-monitor")
+    options.add_argument("--disable-background-timer-throttling")
+    options.add_argument("--disable-renderer-backgrounding")
+    options.add_argument("--disable-backgrounding-occluded-windows")
+    # ======================================================================
+    # use headress browser (ヘッドレスブラウザは全ジャンル、ページ取得するまで開いたままにする・時間短縮)
+    options.add_argument('--headless')  # ヘッドレスを解除する場合はコメントアウト
+
+    # ブラウザ起動
+    driver = webdriver.Chrome(ChromeDriverManager().install(), options=options)
+    # Wait for page source to load ※ソースを読み込むまで待機
+    driver.implicitly_wait(15)
+
     # 設定ファイルからジャンル、ジャンルID読み込み～スクレイピング～CSV作成
     for row in csv.reader(open(genre_file, 'r', encoding='utf-8_sig', newline='')):
         print(f'genre:{row[0]}   genre_id:{row[1]}')
         # スクレイピングとCSV書き込み
-        csv_save(row[0], row[1], intervaltime)
+        csv_save(row[0], row[1], intervaltime, driver)
+
+    driver.close()  # ブラウザを閉じる
 
     # エクセルへの書き込み実行=================================================
     # 【重要】マクロを実行して写真を貼り付ける場合、同じディレクトリにimgフォルダがないとエクセルの画像が
@@ -355,10 +392,10 @@ def main_func(mode=1, mode2=1):
         print(f'開始時間：{start_time}\n終了時間：{end_time}', file=f)
 
 
+
 # ===========================================================================
 
 if __name__ == '__main__':
-
     # 1はテスト、２は本番
     mode_b = 1
 
@@ -372,7 +409,7 @@ if __name__ == '__main__':
         while True:
             main_func(mode=1, mode2=mode_b)
             print('\n*****待機中*****\n')
-            time.sleep(600)
+            time.sleep(180)
 
     elif mode_b == 2:
         # timer
