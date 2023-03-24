@@ -1,7 +1,9 @@
 import csv
 import glob
 import os
+import pathlib
 import random
+import re
 import shutil
 import time
 import lxml
@@ -21,16 +23,22 @@ import add_functions
 
 # path definition============================================================
 path = os.getcwd()
-dat_dir = os.path.join(path, 'dat')  # csc,imgフォルダの親フォルダ
+dat_dir = os.path.join(path, '../dat')  # csc,imgフォルダの親フォルダ
 csv_dir = os.path.join(dat_dir, 'csv')  # csv保存フォルダ
 img_dir = os.path.join(dat_dir, 'img')  # img保存フォルダ
-output_dir = os.path.join(path, 'output')  # 出力フォルダ
-conf_dir = os.path.join(path, 'config')  # テンプレート、タイムテーブルファイル保存フォルダ
+output_dir = os.path.join(path, '../output')  # 出力フォルダ
+conf_dir = os.path.join(path, '../config')  # テンプレート、タイムテーブルファイル保存フォルダ
 keyword_dir = os.path.join(conf_dir, 'keyword')  # 除外キーワードディレクトリ
 # エクセルテンプレートファイル
 ex_temp_file = os.path.join(conf_dir, 'temp_file.xlsm')
 # タイムテーブルファイル
 time_table_file = os.path.join(conf_dir, 'timetable.csv')
+# タイムスタンプファイル
+time_stamp_file = os.path.join(conf_dir, 'time_tamp.txt')
+# キーワードファイル　共通.txt
+common_keyword_file = os.path.join(keyword_dir, '共通.txt')
+
+
 # ===========================================================================
 # Decorator for retries
 def retry(max_attempts, wait_time):
@@ -52,22 +60,23 @@ def retry(max_attempts, wait_time):
 
     return decorator
 
+
 # ===========================================================================
 # 現在日時取得 get Current date and time
 def add_datetime():
     return datetime.now().strftime('%Y-%m-%d-%H_%M_%S')
+
 
 # ===========================================================================
 # イメージファイル名生成
 def filename_creation(src):
     return urllib.parse.urlparse(src)[2].replace('/', '')
 
+
 # ===========================================================================
 # image download
 # When there is only one URL to link to
 def img_save(src, save_dir=img_dir):
-    # if not os.path.isdir(save_dir):
-    #     os.mkdir(save_dir)
     os.makedirs(save_dir, exist_ok=True)
     while True:
         try:
@@ -80,6 +89,7 @@ def img_save(src, save_dir=img_dir):
             print('*******Download error, retry*******')
             time.sleep(1)
 
+
 # ===========================================================================
 # If the linked URL is listed (parallel processing)
 # ※複数のURLから画像をダウンロードするための並列処理
@@ -87,6 +97,7 @@ def img_saves(urls):
     # (withブロックを抜けるまで待機する)　n_jabs=n がスレッド数 verbose=1はメッセージ深度
     with Parallel(n_jobs=-1, verbose=1) as parallel:
         parallel(delayed(img_save)(url) for url in urls)
+
 
 # ===========================================================================
 # エクセルにエクスポート
@@ -96,13 +107,16 @@ def export_ex(output_ex_files_dir, intervaltime):
     csv_filenames = [os.path.basename(file_path)
                      for file_path in glob.glob(os.path.join(csv_dir, f'{intervaltime}_*.csv'))]
 
-    # error防止: 残っているエクセルタスクを強制終了
-    subprocess.run('taskkill /F /T /IM excel.exe', stdout=None, shell=True)
-
     # rakunte/output/intervaltime/日時フォルダに移動しての処理-------------------
     os.chdir(output_ex_files_dir)
+
+    # start eclel application
+    # pywin32
+    excel = win32com.client.Dispatch('Excel.Application')
+    excel.DisplayAlerts = False
+    # time.sleep(3)  # Waiting for Excel to start
+
     for csv_file in csv_filenames:
-        # outputfilename = f"{os.path.splitext(csv_file)[0]}.xlsm"
         # csvから画像ファイル名抽出、ファイル名抽出
         print(f'{csv_file}をエクスポート')
 
@@ -119,53 +133,50 @@ def export_ex(output_ex_files_dir, intervaltime):
                   'r', encoding='utf-8_sig', newline='') as csvf:
             reader = csv.reader(csvf)
             try:
-                # win32com
-                excel = win32com.client.Dispatch('Excel.Application')
-                excel.DisplayAlerts = False
+                # pywin32
                 wb = excel.Workbooks.Open(dummy_file_path)
+                # time.sleep(2)
                 sheet = wb.Worksheets('Sheet1')
                 sheet.Activate()
-                print('csv writing')
+                print('excel writing')
                 for i, lne in enumerate(reader):
                     sheet.Cells(i + 2, 1).Value = lne[2]
                     sheet.Cells(i + 2, 4).Value = lne[0]
                     sheet.Cells(i + 2, 5).Value = lne[3]
                     cell = sheet.Cells(i + 2, 5)
                     cell.Hyperlinks.Add(cell, lne[3])
-                wb.Save()
-                wb.Close()
+                print('writing termination')
             except:
-                print('!!!With error exel-write-handling!!!')
+                print('***')
 
-        time.sleep(0.5)
-
-        # run vba
-        try:
-            print('vba start')
-            xl2 = win32com.client.Dispatch('Excel.Application')
-            xl2.Workbooks.Open(dummy_file_path)
-            xl2.Application.Run('Module1.getimg')
-            xl2.Workbooks(1).Close(SaveChanges=1)
-            print('vba termination')
-        except:
-            print('!!!With error vba-handling!!!')
+            try:
+                print('vba start')
+                excel.Application.Run('Module1.getimg')
+                excel.Workbooks(1).Close(SaveChanges=1)
+                print('vba termination')
+            except:
+                print('!!!With error vba-handling!!!')
 
         time.sleep(1)
 
         # rename ダミーファイル名をジャンル名に
         try:
-            print('rename\n')
             os.rename(dummy_filename, f'{os.path.splitext(csv_file)[0]}.xlsm')
+            print('rename termination\n')
         except:
             print('!!!With error rename-handling!!!')
+
+    # excel spplication shutdown
+    excel.quit()
 
     # カレントディレクトリに復帰
     os.chdir(path)
 
+
 # ===========================================================================
 # Page source acquisition block
 # スクレイピング本体、　１ページのソースからタグを検出、データ取得
-@retry(max_attempts=5, wait_time=10)  # 最大５回、10秒後リトライ
+@retry(max_attempts=5, wait_time=2)  # 最大５回、10秒後リトライ
 def scray_thumbnail(url, driver):
     driver.get(url)
     # 要素が読み込まれるまで待機するためのダミーメソッド
@@ -174,11 +185,16 @@ def scray_thumbnail(url, driver):
     html_source = driver.page_source
     # 保存するデータ抽出(use BeautifulSoup4)
     soup = BeautifulSoup(html_source, 'lxml')  # importでlxmlを削除するとエラーになる
-    tags_titles = soup.select('div.rnkRanking_itemName > a')
-    tags_imgs = soup.select('div.rnkRanking_image > div > a > img')
+    flags = soup.find(src=re.compile('ページが表示できません'))
+    if flags:
+        print(flags)
+        pass
+    else:
+        tags_titles = soup.select('div.rnkRanking_itemName > a')
+        tags_imgs = soup.select('div.rnkRanking_image > div > a > img')
+        return [(tit.text, img.attrs['src'], filename_creation(img.attrs['src']),
+                 tit.attrs['href']) for tit, img in zip(tags_titles, tags_imgs) if tit]
 
-    return [(tit.text, img.attrs['src'], filename_creation(img.attrs['src']),
-             tit.attrs['href']) for tit, img in zip(tags_titles, tags_imgs) if tit]
 
 # ===========================================================================
 # スクレイピングとCSV保存、画像保存
@@ -187,7 +203,7 @@ def csv_save(genre, genre_id, intervaltime, driver):
     global old_csv_datas, keywords, exclusion_keywords, save_data
     print('\nrakuten scray')
     new_data = []
-    for i in range(1, 6):  # 1~５ページ
+    for i in range(1, 5):  # 1~4ページ
         print(f'page:{i}')
         # target_url
         url = f'https://ranking.rakuten.co.jp/{intervaltime}/{genre_id}/p={i}'
@@ -199,16 +215,19 @@ def csv_save(genre, genre_id, intervaltime, driver):
 
     # キーワードディレクトリ＆ファイル確認(消失していた場合は補完）
     add_functions.make_keyword_file_missing()
+
     # ジャンル別キーワードファイル
     exclusion_keyword_file = os.path.join(keyword_dir, f'{genre}.txt')
+    exclusion_keyword_file2 = common_keyword_file
 
     # 古いジャンルcsvファイル無
     if not os.path.isfile(os.path.join(csv_dir, f'{intervaltime}_{genre}.csv')):
         print('ジャンルCSV無、', end='')
         # 除外キーワードファイル有
-        if os.path.isfile(exclusion_keyword_file):
+        if os.path.isfile(exclusion_keyword_file) and os.path.isfile(exclusion_keyword_file2):
             print('除外キーワードファイル有、', end='')
-            keywords = add_functions.read_keywords(exclusion_keyword_file)
+            keywords = add_functions.read_keywords(exclusion_keyword_file) + \
+                       add_functions.read_keywords(exclusion_keyword_file2)
             # キーワード登録無
             if not keywords:
                 # new_dataをそのまま保存
@@ -234,7 +253,7 @@ def csv_save(genre, genre_id, intervaltime, driver):
         if not os.path.isfile(exclusion_keyword_file):
             # 古いジャンルcsvと新規データを比較、差分をnew_dataへ保存
             print('キーワードファイル無、新旧ジャンルcsvの差分をジャンルcsvへ保存')
-            old_data = add_functions\
+            old_data = add_functions \
                 .csv_read_title(os.path.join(csv_dir, f'{intervaltime}_{genre}.csv'))
             save_data = [nd for nd in new_data if not nd[0] in old_data]
 
@@ -246,7 +265,7 @@ def csv_save(genre, genre_id, intervaltime, driver):
             if not keywords:
                 # 古いジャンルcsvと新規データを比較、差分をnew_dataへ保存
                 print('キーワード登録無、新旧データを比較、差分を保存')
-                old_data = add_functions\
+                old_data = add_functions \
                     .csv_read_title(os.path.join(csv_dir, f'{intervaltime}_{genre}.csv'))
                 save_data = [nd for nd in new_data if not nd[0] in old_data]
 
@@ -254,10 +273,13 @@ def csv_save(genre, genre_id, intervaltime, driver):
             else:
                 # ジャンルcsvとキーワードを結合、new_dataと比較する
                 print('キーワード登録有、登録キーワードを結合、新データと比較、差分を保存')
-                old_data = add_functions\
+                old_data = add_functions \
                     .csv_read_title(os.path.join(csv_dir, f'{intervaltime}_{genre}.csv'))
                 joint_data = old_data + keywords
                 save_data = [x for x in new_data if not any(y in x[0] for y in joint_data)]
+
+    # url重複判定（timetable.csv設定値が「URL_duplicate_detection,1」の場合ONになる
+    save_data = add_functions.url_duplicate_detection(save_data, intervaltime, genre)
 
     # img&csv保存===========================================================
     # save_dataから画像のリンクを取得し、ダウンロード（並列処理）
@@ -272,12 +294,17 @@ def csv_save(genre, genre_id, intervaltime, driver):
         csv.writer(sdf).writerows(save_data)
     print('csv saved\n')
 
+
 # ===========================================================================
 # 全処理実行関数　mode:リアルタイム、デイリー、ウィークリー選択　　mode2:テスト、本番実行選択
 def main_func(mode=1, mode2=1):
+    # error防止: 残っているエクセルタスクを強制終了
+    print('\n excel task kill')
+    subprocess.run('taskkill /F /T /IM excel.exe', stdout=None, shell=True)
+
     # 開始時刻取得
     start_time = add_datetime()
-    print('==========スクレイピング処理開始==========')
+    print('\n==========スクレイピング処理開始==========')
 
     # counting period
     global intervaltime, genre_file
@@ -289,10 +316,10 @@ def main_func(mode=1, mode2=1):
     # 取得ジャンル一覧を読み込み
     if mode2 == 1:  # テスト用
         print('\n=====debug mode=====\n')
-        genre_file = os.path.join(path, r'config/test_rakuten_genre.csv')
+        genre_file = os.path.join(path, r'../config/test_rakuten_genre.csv')
     elif mode2 == 2:  # 本実行
         print('\n=====main function=====\n')
-        genre_file = os.path.join(path, r'config/rakuten_genre.csv')
+        genre_file = os.path.join(path, r'../config/rakuten_genre.csv')
     # path definition----------------------------------------------
 
     # csvファイル更新日確認(datフォルダ消去、作成)
@@ -354,21 +381,21 @@ def main_func(mode=1, mode2=1):
     shutil.copytree(img_dir, os.path.join(output_ex_files_dir, 'img'))
 
     print('==========エクセル処理開始==========')
-    time.sleep(0.5)
+    # time.sleep(5)  # コピー終了待機
     # CSVからエクセルへ書き込み＆マクロ実行
     export_ex(output_ex_files_dir, intervaltime)
 
     # 処理時間result
     print('\n==========全処理終了==========')
     end_time = add_datetime()
-    print(f'開始時間：{start_time}')
-    print(f'終了時間：{end_time}')
+    with open(time_stamp_file, 'a', encoding='utf-8_sig') as f:
+        print(f'開始時間：{start_time}\n終了時間：{end_time}', file=f)
+
+
 
 # ===========================================================================
 
 if __name__ == '__main__':
-
-    # テスト、本番選択（テスト用はジャンルが３種類,リアルタイム実行）
     # 1はテスト、２は本番
     mode_b = 1
 

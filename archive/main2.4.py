@@ -23,11 +23,11 @@ import add_functions
 
 # path definition============================================================
 path = os.getcwd()
-dat_dir = os.path.join(path, 'dat')  # csc,imgフォルダの親フォルダ
+dat_dir = os.path.join(path, '../dat')  # csc,imgフォルダの親フォルダ
 csv_dir = os.path.join(dat_dir, 'csv')  # csv保存フォルダ
 img_dir = os.path.join(dat_dir, 'img')  # img保存フォルダ
-output_dir = os.path.join(path, 'output')  # 出力フォルダ
-conf_dir = os.path.join(path, 'config')  # テンプレート、タイムテーブルファイル保存フォルダ
+output_dir = os.path.join(path, '../output')  # 出力フォルダ
+conf_dir = os.path.join(path, '../config')  # テンプレート、タイムテーブルファイル保存フォルダ
 keyword_dir = os.path.join(conf_dir, 'keyword')  # 除外キーワードディレクトリ
 # エクセルテンプレートファイル
 ex_temp_file = os.path.join(conf_dir, 'temp_file.xlsm')
@@ -37,8 +37,6 @@ time_table_file = os.path.join(conf_dir, 'timetable.csv')
 time_stamp_file = os.path.join(conf_dir, 'time_tamp.txt')
 # キーワードファイル　共通.txt
 common_keyword_file = os.path.join(keyword_dir, '共通.txt')
-
-
 # ===========================================================================
 # Decorator for retries
 def retry(max_attempts, wait_time):
@@ -114,7 +112,7 @@ def export_ex(output_ex_files_dir, intervaltime):
     # pywin32
     excel = win32com.client.Dispatch('Excel.Application')
     excel.DisplayAlerts = False
-    # time.sleep(3)  # Waiting for Excel to start
+    time.sleep(5)  # Waiting for Excel to start
 
     for csv_file in csv_filenames:
         # csvから画像ファイル名抽出、ファイル名抽出
@@ -135,7 +133,7 @@ def export_ex(output_ex_files_dir, intervaltime):
             try:
                 # pywin32
                 wb = excel.Workbooks.Open(dummy_file_path)
-                # time.sleep(2)
+                time.sleep(10)
                 sheet = wb.Worksheets('Sheet1')
                 sheet.Activate()
                 print('excel writing')
@@ -195,7 +193,6 @@ def scray_thumbnail(url, driver):
         return [(tit.text, img.attrs['src'], filename_creation(img.attrs['src']),
                  tit.attrs['href']) for tit, img in zip(tags_titles, tags_imgs) if tit]
 
-
 # ===========================================================================
 # スクレイピングとCSV保存、画像保存
 def csv_save(genre, genre_id, intervaltime, driver):
@@ -226,8 +223,7 @@ def csv_save(genre, genre_id, intervaltime, driver):
         # 除外キーワードファイル有
         if os.path.isfile(exclusion_keyword_file) and os.path.isfile(exclusion_keyword_file2):
             print('除外キーワードファイル有、', end='')
-            keywords = add_functions.read_keywords(exclusion_keyword_file) + \
-                       add_functions.read_keywords(exclusion_keyword_file2)
+            keywords = add_functions.read_keywords(exclusion_keyword_file)
             # キーワード登録無
             if not keywords:
                 # new_dataをそのまま保存
@@ -278,9 +274,6 @@ def csv_save(genre, genre_id, intervaltime, driver):
                 joint_data = old_data + keywords
                 save_data = [x for x in new_data if not any(y in x[0] for y in joint_data)]
 
-    # url重複判定（timetable.csv設定値が「URL_duplicate_detection,1」の場合ONになる
-    save_data = add_functions.url_duplicate_detection(save_data, intervaltime, genre)
-
     # img&csv保存===========================================================
     # save_dataから画像のリンクを取得し、ダウンロード（並列処理）
     print('img save now')
@@ -316,10 +309,10 @@ def main_func(mode=1, mode2=1):
     # 取得ジャンル一覧を読み込み
     if mode2 == 1:  # テスト用
         print('\n=====debug mode=====\n')
-        genre_file = os.path.join(path, r'config/test_rakuten_genre.csv')
+        genre_file = os.path.join(path, r'../config/test_rakuten_genre.csv')
     elif mode2 == 2:  # 本実行
         print('\n=====main function=====\n')
-        genre_file = os.path.join(path, r'config/rakuten_genre.csv')
+        genre_file = os.path.join(path, r'../config/rakuten_genre.csv')
     # path definition----------------------------------------------
 
     # csvファイル更新日確認(datフォルダ消去、作成)
@@ -392,10 +385,11 @@ def main_func(mode=1, mode2=1):
         print(f'開始時間：{start_time}\n終了時間：{end_time}', file=f)
 
 
-
 # ===========================================================================
 
 if __name__ == '__main__':
+
+    # テスト、本番選択（テスト用はジャンルが３種類,リアルタイム実行）
     # 1はテスト、２は本番
     mode_b = 1
 

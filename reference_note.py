@@ -1,37 +1,11 @@
-import csv
-import glob
-import shutil
-import os
 import urllib.parse
-from datetime import datetime
-import main4
-import csv
-import glob
 import os
-import sys
-import random
 import re
-import shutil
 import time
-import lxml
-import subprocess
 import urllib.parse
-from datetime import datetime
-from functools import wraps
 import requests
 from requests.exceptions import Timeout
-import schedule
-import win32com.client
 from bs4 import BeautifulSoup
-from joblib import Parallel, delayed
-import add_functions
-import logging
-import openpyxl
-from openpyxl.styles import Font
-from openpyxl.styles import Alignment
-import json
-from pprint import pprint
-import xml
 
 # path definition============================================================
 path = os.getcwd()

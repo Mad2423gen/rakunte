@@ -23,11 +23,11 @@ import add_functions
 
 # path definition============================================================
 path = os.getcwd()
-dat_dir = os.path.join(path, 'dat')  # csc,imgフォルダの親フォルダ
+dat_dir = os.path.join(path, '../dat')  # csc,imgフォルダの親フォルダ
 csv_dir = os.path.join(dat_dir, 'csv')  # csv保存フォルダ
 img_dir = os.path.join(dat_dir, 'img')  # img保存フォルダ
-output_dir = os.path.join(path, 'output')  # 出力フォルダ
-conf_dir = os.path.join(path, 'config')  # テンプレート、タイムテーブルファイル保存フォルダ
+output_dir = os.path.join(path, '../output')  # 出力フォルダ
+conf_dir = os.path.join(path, '../config')  # テンプレート、タイムテーブルファイル保存フォルダ
 keyword_dir = os.path.join(conf_dir, 'keyword')  # 除外キーワードディレクトリ
 # エクセルテンプレートファイル
 ex_temp_file = os.path.join(conf_dir, 'temp_file.xlsm')
@@ -316,10 +316,10 @@ def main_func(mode=1, mode2=1):
     # 取得ジャンル一覧を読み込み
     if mode2 == 1:  # テスト用
         print('\n=====debug mode=====\n')
-        genre_file = os.path.join(path, r'config/test_rakuten_genre.csv')
+        genre_file = os.path.join(path, r'../config/test_rakuten_genre.csv')
     elif mode2 == 2:  # 本実行
         print('\n=====main function=====\n')
-        genre_file = os.path.join(path, r'config/rakuten_genre.csv')
+        genre_file = os.path.join(path, r'../config/rakuten_genre.csv')
     # path definition----------------------------------------------
 
     # csvファイル更新日確認(datフォルダ消去、作成)
