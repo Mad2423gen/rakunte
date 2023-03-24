@@ -132,3 +132,9 @@ if __name__ == '__main__':
         # print(title_lists)
         # print(title_urls)
         # print(img_urls[1])
+
+if __name__ == '__main__':
+    dt = ['a', 'b', 'c']
+    print(dt)
+    dt[2] = 'd'
+    print(dt)

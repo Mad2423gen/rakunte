@@ -6,8 +6,8 @@ import re
 import requests
 from bs4 import BeautifulSoup
 
-
 import lxml
+
 # path definition============================================================
 path = os.getcwd()
 dat_dir = os.path.join(path, 'dat')  # csc,imgフォルダの親フォルダ
@@ -30,6 +30,7 @@ time_stamp_file = os.path.join(conf_dir, 'time_tamp.txt')
 # キーワードファイル　共通.txt
 common_keyword_file = os.path.join(keyword_dir, '共通.txt')
 
+
 # ===========================================================================
 # csv read タイトルのみ取得　リストで返す
 def csv_read_title(csv_file):
@@ -40,10 +41,13 @@ def csv_read_title(csv_file):
 def csv_read(csv_file):
     return [row for row in csv.reader(open(csv_file, 'r', encoding='utf-8_sig', newline=''))]
 
+
 # 空のファイルを作る
 def make_file(filename):
     with open(filename, 'w', encoding='utf-8_sig') as f:
         pass
+
+
 # テキストファイルのキーワードを取得　リストで返す
 def read_keywords(file):
     with open(file, 'r', encoding='utf-8_sig') as rf:
@@ -75,6 +79,7 @@ def make_keyword_file():
         make_file(f'{lt[0]}.txt')
     make_file(common_keyword_file)
 
+
 # 不足しているキーワードディレクトリ、ファイルを作成
 def make_keyword_file_missing():
     # ディレクトリ消失
@@ -89,6 +94,7 @@ def make_keyword_file_missing():
     if not os.path.isfile(common_keyword_file):
         make_file(common_keyword_file)
 
+
 # 既に保存されているURLを新規データと比較して差分を返す
 def url_duplicate_detection(save_data, intervaltime, genre):
     old_filename = f'{intervaltime}_{genre}.csv'
@@ -101,6 +107,7 @@ def url_duplicate_detection(save_data, intervaltime, genre):
     else:
         out = save_data
     return out
+
 
 # レビューとプライスを付加したバージョン ※mainに移動したので一応使っていない　2023-03-13
 def scray_thumbnail2(target_url):
@@ -170,6 +177,7 @@ def scray_thumbnail2(target_url):
             # -----------------------------------
         return out_datas
         # return print(out_datas[0]) # for developer testing
+
 
 #
 # ---------------------------------------------------------------------------------
