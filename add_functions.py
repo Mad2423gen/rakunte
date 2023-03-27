@@ -5,7 +5,7 @@ import time
 import re
 import requests
 from bs4 import BeautifulSoup
-
+import glob
 import lxml
 
 # path definition============================================================
@@ -29,6 +29,8 @@ keyword_dir = os.path.join(conf_dir, 'keyword')
 time_stamp_file = os.path.join(conf_dir, 'time_tamp.txt')
 # キーワードファイル　共通.txt
 common_keyword_file = os.path.join(keyword_dir, '共通.txt')
+# URLディレクトリ
+id_dir = os.path.join(path, 'id')
 
 
 # ===========================================================================
@@ -177,6 +179,45 @@ def scray_thumbnail2(target_url):
             # -----------------------------------
         return out_datas
         # return print(out_datas[0]) # for developer testing
+
+
+# ===========================================================================
+"""
+追加オーダー：idファイルを作成する（エクセルに網掛けを設定するため）
+　imgファイル名がユニーク文字列なのでidとして扱う
+第一引数はインポートする期間名、第二引数は要素の列番
+"""
+
+
+# def save_id(time_interval, designated_column):
+#     # 　csvファイルをインポートする（リアルタイム、デイリー、ウィークリーのいずれかで全部）
+#     csv_files = glob.glob(os.path.join(csv_dir, f'{time_interval}_*.csv'))
+#     id_list = []
+#     for csv_file in csv_files:
+#         with open(csv_file, 'r', encoding='utf-8_sig', newline='') as rf:
+#             reader = csv.reader(rf)
+#             for row in reader:
+#                 # 　imgファイル名を抽出
+#                 id_list.append(row[designated_column])
+#     save_filename = os.path.join(id_dir, f'{time_interval}_id.txt')
+#     with open(save_filename, 'a', encoding='utf-8_sig') as wf:
+#         for row in id_list:
+#             print(row)
+#             wf.write(row + '\n')
+
+
+# idファイルをインポートして、set型に変換する、引数はジャンル名
+# set型は検索する時に高速に検索できる
+def read_id_add_set(time_interval):
+    read_txt = set()
+    read_filename = os.path.join(id_dir, f'{time_interval}_id.txt')
+    with open(read_filename, 'r', encoding='utf-8_sig') as rf:
+        for row in rf:
+            read_txt.add(row.strip())
+    return read_txt
+
+
+# ===========================================================================
 
 
 #

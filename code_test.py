@@ -38,51 +38,47 @@ time_table_file = os.path.join(conf_dir, 'timetable.csv')
 time_stamp_file = os.path.join(conf_dir, 'time_tamp.txt')
 # キーワードファイル　共通.txt
 common_keyword_file = os.path.join(keyword_dir, '共通.txt')
-
-# todo: 追加分
 # URLディレクトリ
 id_dir = os.path.join(path, 'id')
 
 
 # ===========================================================================
 # 追加オーダー：idファイルを作成する（エクセルに網掛けを設定するため）
-def save_id(genre, designated_column):
-    csv_files = glob.glob(os.path.join(csv_dir, f'{genre}_*.csv'))
-    output_file_name = os.path.join(id_dir, f'{genre}_id.txt')
+# 第一引数はインポートするジャンル名、第二引数はid要素の列番
+def save_id(time_interval, designated_column):
+    csv_files = glob.glob(os.path.join(csv_dir, f'{time_interval}_*.csv'))
     id_list = []
     for csv_file in csv_files:
         with open(csv_file, 'r', encoding='utf-8_sig', newline='') as rf:
             reader = csv.reader(rf)
             for row in reader:
                 id_list.append(row[designated_column])
-    if os.path.isfile(id_file):
-        with open(output_file_name, 'a', encoding='utf-8_sig') as wf:
-            for id_name in id_list:
-                wf.write(str(id_name) + '\n')
-    else:
-        with open(output_file_name, 'w', encoding='utf-8_sig') as wf:
-            for id_name in id_list:
-                wf.write(str(id_name) + '\n')
+    save_filename = os.path.join(id_dir, f'{time_interval}_id.txt')
+    with open(save_filename, 'a', encoding='utf-8_sig') as wf:
+        for row in id_list:
+            print(row)
+            wf.write(row + '\n')
 
 
-# 返り値を集合で返す
-def read_id_add_set():
-    read_txts = set()
-    text_list = glob.glob(os.path.join(id_dir, '*.txt'))
-    for text in text_list:
-        with open(text, 'r', encoding='utf-8_sig') as rf:
-            for line in rf:
-                read_txts.add(line.strip())
-    pprint(read_txts)
-    return read_txts
+# idファイルをインポートして、set型に変換する、引数はジャンル名
+def read_id_add_set(time_interval):
+    read_txt = set()
+    read_filename = os.path.join(id_dir, f'{time_interval}_id.txt')
+    with open(read_filename, 'r', encoding='utf-8_sig') as rf:
+        for row in rf:
+            read_txt.add(row.strip())
+    return read_txt
 
 # ===========================================================================
 
 
 if __name__ == '__main__':
-    genre = 'realtime'
-    id_file = os.path.join(id_dir, f'{genre}_id.txt')
-    if os.path.isfile(id_file):
-        os.remove(id_file)
-    save_id(genre, 2)
-    read_id_add_set()
+    # id_files = glob.glob(os.path.join(id_dir, '*.txt'))
+    # if id_files:
+    #     for id_file in id_files:
+    #         os.remove(id_file)
+
+    time_interval = 'realtime'
+    designated_column = 2
+    # save_id(time_interval, designated_column)
+    s_list = read_id_add_set(time_interval)

@@ -1,4 +1,3 @@
-
 import csv
 import glob
 import os
@@ -7,6 +6,8 @@ import random
 import re
 import shutil
 import time
+from pprint import pprint
+
 import lxml
 import subprocess
 import urllib.parse
@@ -37,6 +38,8 @@ time_table_file = os.path.join(conf_dir, 'timetable.csv')
 time_stamp_file = os.path.join(conf_dir, 'time_tamp.txt')
 # キーワードファイル　共通.txt
 common_keyword_file = os.path.join(keyword_dir, '共通.txt')
+# idディレクトリ
+id_dir = os.path.join(path, 'id')
 
 
 # ===========================================================================
@@ -80,13 +83,18 @@ def img_saves(urls):
 # ===========================================================================
 # エクセルにエクスポート
 # 引数： output_ex_files_dir == otput/time_interval_dir/datetime
-def export_ex(output_ex_files_dir, intervaltime):
+def export_ex(output_ex_files_dir, intervaltime, id_status):
     # csvファイルリスト作成
     csv_filenames = [os.path.basename(file_path)
                      for file_path in glob.glob(os.path.join(csv_dir, f'{intervaltime}_*.csv'))]
 
     # rakunte/output/intervaltime/日時フォルダに移動しての処理-------------------
     os.chdir(output_ex_files_dir)
+
+    # idファイルのデータによって、エクセルの書き込みを変更する
+    id_file = os.path.join(id_dir, f'{intervaltime}_id.txt')
+    # datetime
+    now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
     # start eclel application
     # pywin32
@@ -116,23 +124,73 @@ def export_ex(output_ex_files_dir, intervaltime):
                 sheet = wb.Worksheets('Sheet1')
                 sheet.Activate()
                 print('excel writing')
-                for i, lne in enumerate(reader):
-                    # img filename
-                    sheet.Cells(i + 2, 1).Value = lne[2]
-                    # title
-                    sheet.Cells(i + 2, 4).Value = lne[0]
-                    # title link
-                    sheet.Cells(i + 2, 5).Value = lne[3]
-                    cell = sheet.Cells(i + 2, 5)
-                    cell.Hyperlinks.Add(cell, lne[3])
-                    # price
-                    sheet.Cells(i + 2, 6).Value = lne[4]
-                    # review
-                    sheet.Cells(i + 2, 7).Value = lne[5]
+                # idファイルがある場合
+                if not id_status:  # todo:ファイル名で判断させる（仮ファイルがある場合は最後で正式に戻す）
+                    id_lists = add_functions.read_id_add_set(intervaltime)
+                    for i, lne in enumerate(reader):
+                        if lne[2] == '':
+                            # title
+                            sheet.Cells(i + 2, 4).Value = lne[0]
+                            # img add dummy
+                            sheet.Cells(i + 2, 1).Value = 'blankblankblank.jpg'
+                            # detetime
+                            sheet.Cells(i + 2, 8).Value = now
+                        else:
+                            # img filename
+                            sheet.Cells(i + 2, 1).Value = lne[2]
+                            # title
+                            sheet.Cells(i + 2, 4).Value = lne[0]
+                            # title link
+                            sheet.Cells(i + 2, 5).Value = lne[3]
+                            cell = sheet.Cells(i + 2, 5)
+                            cell.Hyperlinks.Add(cell, lne[3])
+                            # price
+                            sheet.Cells(i + 2, 6).Value = lne[4]
+                            # review
+                            sheet.Cells(i + 2, 7).Value = lne[5]
+                            # detetime
+                            sheet.Cells(i + 2, 8).Value = now
+                            # new
+                            sheet.Cells(i + 2, 9).Value = 'new'
+                            # add bg color change font color E7E6E6
+                            if lne[2] in id_lists:
+                                sheet.Range(sheet.Cells(i + 2, 2),
+                                            sheet.Cells(i + 2, 8)).Interior.Color = int('E7E6E6', 16)
+                                sheet.Cells(i + 2, 1).Font.Color = int('E7E6E6', 16)
+                                # delete new
+                                sheet.Cells(i + 2, 9).Value = ''
+
+                # idファイルがない場合-->>網掛け不要
+                else:
+                    for i, lne in enumerate(reader):
+                        if lne[2] == '':
+                            # title
+                            sheet.Cells(i + 2, 4).Value = lne[0]
+                            # img add dummy
+                            sheet.Cells(i + 2, 1).Value = 'blankblankblank.jpg'
+                            # detetime
+                            sheet.Cells(i + 2, 8).Value = now
+                        else:
+                            # img filename
+                            sheet.Cells(i + 2, 1).Value = lne[2]
+                            # title
+                            sheet.Cells(i + 2, 4).Value = lne[0]
+                            # title link
+                            sheet.Cells(i + 2, 5).Value = lne[3]
+                            cell = sheet.Cells(i + 2, 5)
+                            cell.Hyperlinks.Add(cell, lne[3])
+                            # price
+                            sheet.Cells(i + 2, 6).Value = lne[4]
+                            # review
+                            sheet.Cells(i + 2, 7).Value = lne[5]
+                            # detetime
+                            sheet.Cells(i + 2, 8).Value = now
+                            # new
+                            sheet.Cells(i + 2, 9).Value = 'new'
 
                 print('writing termination')
             except:
-                print('***')
+                pass
 
             # start vba-------------------------------------------------
             try:
@@ -179,7 +237,6 @@ def scray_thumbnail(url):
                 print('該当ページなし、スキップ')
                 pass
             else:
-                # todo:　書き換え　レビューと価格追加
                 tags_titles = soup.select('div.rnkRanking_itemName > a')
                 tags_imgs = soup.select('div.rnkRanking_image > div > a > img')
                 return [(tit.text, img.attrs['src'], filename_creation(img.attrs['src']),
@@ -192,7 +249,6 @@ def scray_thumbnail(url):
 # ===========================================================================
 # priceとreview 追加
 def scray_thumbnail2(target_url):
-
     # time.sleep(0.25)
     res = requests.get(target_url, timeout=(30.0, 30.0))
 
@@ -248,13 +304,14 @@ def scray_thumbnail2(target_url):
         for i, title in enumerate(title_lists):
             # entry is --> title, img_url, filename, title_url, price, review
             # print(img_urls[i])
-             out_datas.append((title, img_urls[i], filename_creation(img_urls[i]), title_urls[i], price_lists[i], revirews_lists[i]))
-            # for developer testing -------------
-            # print(price_lists)
-            # print(title_lists)
-            # print(title_urls)
-            # print(img_urls[1])
-            # -----------------------------------
+            out_datas.append(
+                (title, img_urls[i], filename_creation(img_urls[i]), title_urls[i], price_lists[i], revirews_lists[i]))
+        # for developer testing -------------
+        # print(price_lists)
+        # print(title_lists)
+        # print(title_urls)
+        # print(img_urls[1])
+        # -----------------------------------
         return out_datas
         # return print(out_datas[0]) # for developer testing
 
@@ -263,7 +320,7 @@ def scray_thumbnail2(target_url):
 # スクレイピングとCSV保存、画像保存
 def csv_save(genre, genre_id, intervaltime):
     # スクレイピング　（ジャンル内の全ページデータ取得）
-    global old_csv_datas, keywords, exclusion_keywords, save_data
+    global old_csv_datas, keywords, exclusion_keywords, save_data, id_new
     print('\nrakuten scray')
     new_data = []
     for i in range(1, 5):  # 1~4ページ
@@ -351,6 +408,31 @@ def csv_save(genre, genre_id, intervaltime):
     # url重複判定（timetable.csv設定値が「URL_duplicate_detection,1」の場合ONになる
     save_data = add_functions.url_duplicate_detection(save_data, intervaltime, genre)
 
+    """
+    id重複判定>>>過去に保存したidと比較し、重複していたら0、重複していなかったら1を追加
+    エクセルに網掛けをするかどうか判断するために追加
+    imgファイル名をidとして、idファイルを作成、保存、比較する
+    動作：idファイルがあれば、idファイルのidを読み込み、save_dataのidと比較し、重複していなければidファイルに追加
+    id == imgファイル名
+    """
+    print('新規商品判定')
+    # idファイル有-------------------
+    if os.path.isfile(id_file := os.path.join(id_dir, f'{intervaltime}_id.txt')):  # idファイルパス
+        # 新規ファイルかどうかをエクセル処理に渡す
+        id_new = False
+
+        cash_id_list = add_functions.read_id_add_set(intervaltime)
+        [cash_id_list.add(row[2]) for row in save_data if not row[2] in cash_id_list]
+    # idファイル無-------------------
+    else:
+        # idファイルがなければ新規作成 save_dataのidを保存
+        # 新規ファイルかどうかをエクセル処理に渡す
+        id_new = True
+        cash_id_list = set()
+        [cash_id_list.add(row[2]) for row in save_data]
+    with open(id_file, 'w', encoding='utf-8_sig') as idf:
+        idf.write('\n'.join(cash_id_list))
+
     # img&csv保存===========================================================
     # save_dataから画像のリンクを取得し、ダウンロード（並列処理）
     print('img save now')
@@ -361,8 +443,13 @@ def csv_save(genre, genre_id, intervaltime):
     print('csv save now')
     with open(os.path.join(csv_dir, f'{intervaltime}_{genre}.csv'),
               'a', encoding='utf-8_sig', newline='') as sdf:
+        # 追加開始時刻をcsvに追加
+        add_start_title = f'*****{add_datetime()}追加*****'
+        csv.writer(sdf).writerow([add_start_title, '', '', '', ''])
+        # csvにデータを追加
         csv.writer(sdf).writerows(save_data)
     print('csv saved\n')
+    return id_new
 
 
 # ===========================================================================
@@ -409,7 +496,7 @@ def main_func(mode=1, mode2=1):
     for row in csv.reader(open(genre_file, 'r', encoding='utf-8_sig', newline='')):
         print(f'genre:{row[0]}   genre_id:{row[1]}')
         # スクレイピングとCSV書き込み
-        csv_save(row[0], row[1], intervaltime)
+        id_status = csv_save(row[0], row[1], intervaltime)
 
     # エクセルへの書き込み実行=================================================
     # 【重要】マクロを実行して写真を貼り付ける場合、同じディレクトリにimgフォルダがないとエクセルの画像が
@@ -423,11 +510,14 @@ def main_func(mode=1, mode2=1):
     # 写真ファイルのコピー dat/imgからoutpu/intervaltime/datetime/img
     print('copy img files')
     shutil.copytree(img_dir, os.path.join(output_ex_files_dir, 'img'))
+    # dummy image ※VBAで画像を貼り付けるときに、画像がないとエラーになるので、ダミー画像を入れておく
+    shutil.copyfile(os.path.join(conf_dir, 'blankblankblank.jpg'),
+                    os.path.join(output_ex_files_dir, r'img/blankblankblank.jpg'))
 
     print('==========エクセル処理開始==========')
     # time.sleep(5)  # コピー終了待機
     # CSVからエクセルへ書き込み＆マクロ実行
-    export_ex(output_ex_files_dir, intervaltime)
+    export_ex(output_ex_files_dir, intervaltime, id_status)
 
     # 処理時間result
     print('\n==========全処理終了==========')
@@ -441,7 +531,7 @@ def main_func(mode=1, mode2=1):
 if __name__ == '__main__':
 
     # 1はテスト、２は本番
-    mode_b = 1
+    mode_b = 2
 
     # time_table import
     time_list = []
