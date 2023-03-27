@@ -125,7 +125,7 @@ def export_ex(output_ex_files_dir, intervaltime, id_status):
                 sheet.Activate()
                 print('excel writing')
                 # idファイルがある場合
-                if not id_status:  # todo:ファイル名で判断させる（仮ファイルがある場合は最後で正式に戻す）
+                if not id_status:
                     id_lists = add_functions.read_id_add_set(intervaltime)
                     for i, lne in enumerate(reader):
                         if lne[2] == '':
